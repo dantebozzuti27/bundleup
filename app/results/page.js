@@ -56,6 +56,70 @@ function ResultsContent() {
     }
   };
 
+  // Calculate bundles from search results
+  const bundles = (searchResults?.bundles || []).filter(b => b.totalPrice != null && b.totalPrice > 0);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-16 h-16 text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-xl text-gray-700">Searching for best deals...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">Error</h2>
+          <p className="text-gray-700 mb-4">{error}</p>
+          <button
+            onClick={() => router.push('/')}
+            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-semibold"
+          >
+            Back to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // No results
+  if (!searchResults || !searchResults.results) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">No Results</h2>
+          <p className="text-gray-700 mb-4">We couldn't find any products for your search.</p>
+          <button
+            onClick={() => router.push('/')}
+            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-semibold"
+          >
+            Back to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Header */}
+      <header className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center space-x-2">
+            <ShoppingCart className="w-8 h-8 text-blue-600" />
+            <span className="text-2xl font-bold text-gray-900">BundleUp</span>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
             Your Best Deals
@@ -67,8 +131,12 @@ function ResultsContent() {
 
         {/* Bundle Options */}
         {bundles.length > 0 && (
-          <div className="grid md:grid-cols-3 gap-6 mb-12">
-            {bundles.map((bundle, index) => (
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">
+              Bundle Deals by Retailer
+            </h2>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {bundles.map((bundle, index) => (
               <div
                 key={bundle.retailer}
                 className={`bg-white rounded-xl shadow-lg p-6 ${
@@ -84,20 +152,31 @@ function ResultsContent() {
                   {bundle.retailer}
                 </h3>
                 <p className="text-sm text-gray-600 mb-4">
-                  Complete bundle from one store
+                  {bundle.completeness === 100 
+                    ? 'Complete bundle from one store' 
+                    : `${bundle.itemCount} of ${bundle.itemCount + bundle.missingItems} items available`}
                 </p>
-                <div className="text-4xl font-bold text-blue-600 mb-4">
-                  ${bundle.totalPrice.toFixed(2)}
+                <div className="text-4xl font-bold text-blue-600 mb-2">
+                  ${(bundle.totalPrice || 0).toFixed(2)}
                 </div>
+                {bundle.completeness < 100 && (
+                  <p className="text-xs text-amber-600 mb-4">
+                    {bundle.missingItems} item{bundle.missingItems > 1 ? 's' : ''} not available
+                  </p>
+                )}
                 <button className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-semibold flex items-center justify-center space-x-2">
                   <ShoppingCart className="w-5 h-5" />
                   <span>Buy from {bundle.retailer}</span>
                 </button>
-                <p className="text-xs text-gray-500 mt-3 text-center">
-                  {bundle.itemCount} items • One checkout
-                </p>
+                <div className="mt-3 text-center">
+                  <div className="flex items-center justify-center space-x-2 text-xs text-gray-500">
+                    <Package className="w-4 h-4" />
+                    <span>{bundle.itemCount} items • {bundle.completeness}% complete</span>
+                  </div>
+                </div>
               </div>
             ))}
+          </div>
           </div>
         )}
 

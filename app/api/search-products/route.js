@@ -102,44 +102,81 @@ export async function POST(request) {
 function calculateRetailerBundles(results) {
   const retailerMap = new Map();
 
-  // Aggregate products by retailer
+  // For each item in the checklist
   results.forEach(result => {
-    if (result.allProducts && result.allProducts.length > 0) {
-      result.allProducts.forEach(product => {
-        const source = product.source || 'Unknown';
-        
-        if (!retailerMap.has(source)) {
-          retailerMap.set(source, {
-            retailer: source,
-            items: [],
-            totalPrice: 0,
-            itemCount: 0,
+    if (!result.allProducts || result.allProducts.length === 0) {
+      return;
+    }
+
+    // Find the cheapest product from each retailer for this item
+    const retailerBestPrices = new Map();
+    
+    result.allProducts.forEach(product => {
+      if (!product.price || !product.source) return;
+      
+      const source = product.source;
+      const price = parseFloat(product.price);
+      
+      // Skip invalid prices
+      if (isNaN(price) || price <= 0) return;
+      
+      // Keep the cheapest product from each retailer for this item
+      if (!retailerBestPrices.has(source)) {
+        retailerBestPrices.set(source, {
+          product: product,
+          price: price,
+          itemName: result.itemName
+        });
+      } else {
+        const current = retailerBestPrices.get(source);
+        if (price < current.price) {
+          retailerBestPrices.set(source, {
+            product: product,
+            price: price,
+            itemName: result.itemName
           });
         }
+      }
+    });
 
-        const bundle = retailerMap.get(source);
-        bundle.items.push({
-          itemName: result.itemName,
-          product: product,
+    // Add best price from each retailer to the bundle
+    retailerBestPrices.forEach((best, source) => {
+      if (!retailerMap.has(source)) {
+        retailerMap.set(source, {
+          retailer: source,
+          items: [],
+          totalPrice: 0,
+          itemCount: 0,
         });
-        bundle.totalPrice += parseFloat(product.price) || 0;
-        bundle.itemCount += 1;
-      });
-    }
+      }
+
+      const bundle = retailerMap.get(source);
+      bundle.items.push(best);
+      bundle.totalPrice += best.price;
+      bundle.itemCount += 1;
+    });
   });
 
-  // Convert to array and sort by completeness and price
+  // Convert to array and sort
+  const totalItems = results.filter(r => r.allProducts && r.allProducts.length > 0).length;
+  
   const bundles = Array.from(retailerMap.values())
-    .filter(b => b.itemCount >= results.length * 0.5) // At least 50% of items
+    .filter(b => b.itemCount > 0 && b.totalPrice > 0)
+    .map(bundle => ({
+      ...bundle,
+      totalPrice: Math.round(bundle.totalPrice * 100) / 100,
+      completeness: Math.round((bundle.itemCount / totalItems) * 100),
+      missingItems: totalItems - bundle.itemCount,
+    }))
     .sort((a, b) => {
-      // Prioritize bundles with more items
+      // Sort by completeness first (more items = better)
       if (b.itemCount !== a.itemCount) {
         return b.itemCount - a.itemCount;
       }
-      // Then sort by price
+      // Then by price (cheaper = better)
       return a.totalPrice - b.totalPrice;
     })
-    .slice(0, 3); // Top 3 bundles
+    .slice(0, 5);
 
   return bundles;
 }
