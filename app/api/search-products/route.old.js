@@ -50,11 +50,7 @@ export async function POST(request) {
         // Sort by price
         const sortedProducts = products
           .filter(p => p.price && p.title)
-          .sort((a, b) => {
-            const priceA = parseFloat(String(a.price).replace(/[$,\s]/g, ''));
-            const priceB = parseFloat(String(b.price).replace(/[$,\s]/g, ''));
-            return priceA - priceB;
-          });
+          .sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
 
         // Divide into 3 tiers
         const tierSize = Math.ceil(sortedProducts.length / 3);
@@ -84,10 +80,8 @@ export async function POST(request) {
 
     const results = await Promise.all(searchPromises);
 
-    console.log('\n📦 Starting bundle calculation...');
     // Calculate bundle totals by retailer
     const retailerBundles = calculateRetailerBundles(results);
-    console.log('📦 Bundle calculation complete. Returning', retailerBundles.length, 'bundles\n');
 
     return NextResponse.json({
       success: true,
@@ -106,48 +100,25 @@ export async function POST(request) {
 }
 
 function calculateRetailerBundles(results) {
-  console.log('\n=== BUNDLE CALCULATION START ===');
-  console.log('Total results to process:', results.length);
-  
   const retailerMap = new Map();
 
   // For each item in the checklist
-  results.forEach((result, resultIndex) => {
-    console.log(`\nProcessing result ${resultIndex + 1}: "${result.itemName}"`);
-    console.log('  All products count:', result.allProducts?.length || 0);
-    
+  results.forEach(result => {
     if (!result.allProducts || result.allProducts.length === 0) {
-      console.log('  ⚠️  Skipping - no products found');
       return;
     }
 
     // Find the cheapest product from each retailer for this item
     const retailerBestPrices = new Map();
     
-    result.allProducts.forEach((product, prodIndex) => {
-      console.log(`    Product ${prodIndex + 1}:`, {
-        source: product.source,
-        price: product.price,
-        title: product.title?.substring(0, 30)
-      });
-      
-      if (!product.price || !product.source) {
-        console.log('      ⚠️  Skipping - missing price or source');
-        return;
-      }
+    result.allProducts.forEach(product => {
+      if (!product.price || !product.source) return;
       
       const source = product.source;
-      // Remove dollar signs, commas, and spaces, then parse
-      const priceString = String(product.price).replace(/[$,\s]/g, '');
-      const price = parseFloat(priceString);
-      
-      console.log(`      Raw price: "${product.price}" → Cleaned: "${priceString}" → Parsed: ${price}`);
+      const price = parseFloat(product.price);
       
       // Skip invalid prices
-      if (isNaN(price) || price <= 0) {
-        console.log('      ⚠️  Skipping - invalid price:', price);
-        return;
-      }
+      if (isNaN(price) || price <= 0) return;
       
       // Keep the cheapest product from each retailer for this item
       if (!retailerBestPrices.has(source)) {
@@ -156,7 +127,6 @@ function calculateRetailerBundles(results) {
           price: price,
           itemName: result.itemName
         });
-        console.log(`      ✓ Set as best price for ${source}: $${price}`);
       } else {
         const current = retailerBestPrices.get(source);
         if (price < current.price) {
@@ -165,12 +135,9 @@ function calculateRetailerBundles(results) {
             price: price,
             itemName: result.itemName
           });
-          console.log(`      ✓ Updated best price for ${source}: $${price} (was $${current.price})`);
         }
       }
     });
-
-    console.log(`  Found best prices from ${retailerBestPrices.size} retailers`);
 
     // Add best price from each retailer to the bundle
     retailerBestPrices.forEach((best, source) => {
@@ -181,35 +148,20 @@ function calculateRetailerBundles(results) {
           totalPrice: 0,
           itemCount: 0,
         });
-        console.log(`  Created new bundle for: ${source}`);
       }
 
       const bundle = retailerMap.get(source);
       bundle.items.push(best);
       bundle.totalPrice += best.price;
       bundle.itemCount += 1;
-      console.log(`  Added to ${source} bundle: $${best.price} (total now: $${bundle.totalPrice})`);
     });
-  });
-
-  console.log('\n=== BUNDLE AGGREGATION ===');
-  console.log('Total retailers found:', retailerMap.size);
-  retailerMap.forEach((bundle, retailer) => {
-    console.log(`${retailer}: ${bundle.itemCount} items, $${bundle.totalPrice.toFixed(2)}`);
   });
 
   // Convert to array and sort
   const totalItems = results.filter(r => r.allProducts && r.allProducts.length > 0).length;
-  console.log('\nTotal items to match:', totalItems);
   
   const bundles = Array.from(retailerMap.values())
-    .filter(b => {
-      const valid = b.itemCount > 0 && b.totalPrice > 0;
-      if (!valid) {
-        console.log(`  ⚠️  Filtering out ${b.retailer}: items=${b.itemCount}, price=${b.totalPrice}`);
-      }
-      return valid;
-    })
+    .filter(b => b.itemCount > 0 && b.totalPrice > 0)
     .map(bundle => ({
       ...bundle,
       totalPrice: Math.round(bundle.totalPrice * 100) / 100,
@@ -225,13 +177,6 @@ function calculateRetailerBundles(results) {
       return a.totalPrice - b.totalPrice;
     })
     .slice(0, 5);
-
-  console.log('\n=== FINAL BUNDLES ===');
-  console.log('Bundles to return:', bundles.length);
-  bundles.forEach((bundle, index) => {
-    console.log(`${index + 1}. ${bundle.retailer}: ${bundle.itemCount}/${totalItems} items ($${bundle.totalPrice}) - ${bundle.completeness}% complete`);
-  });
-  console.log('=== BUNDLE CALCULATION END ===\n');
 
   return bundles;
 }

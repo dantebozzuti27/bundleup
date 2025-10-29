@@ -50,11 +50,7 @@ export async function POST(request) {
         // Sort by price
         const sortedProducts = products
           .filter(p => p.price && p.title)
-          .sort((a, b) => {
-            const priceA = parseFloat(String(a.price).replace(/[$,\s]/g, ''));
-            const priceB = parseFloat(String(b.price).replace(/[$,\s]/g, ''));
-            return priceA - priceB;
-          });
+          .sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
 
         // Divide into 3 tiers
         const tierSize = Math.ceil(sortedProducts.length / 3);
@@ -137,11 +133,7 @@ function calculateRetailerBundles(results) {
       }
       
       const source = product.source;
-      // Remove dollar signs, commas, and spaces, then parse
-      const priceString = String(product.price).replace(/[$,\s]/g, '');
-      const price = parseFloat(priceString);
-      
-      console.log(`      Raw price: "${product.price}" → Cleaned: "${priceString}" → Parsed: ${price}`);
+      const price = parseFloat(product.price);
       
       // Skip invalid prices
       if (isNaN(price) || price <= 0) {

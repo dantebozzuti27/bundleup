@@ -57,7 +57,7 @@ function ResultsContent() {
   };
 
   // Calculate bundles from search results
-  const bundles = searchResults?.bundles || [];
+  const bundles = (searchResults?.bundles || []).filter(b => b.totalPrice != null && b.totalPrice > 0);
 
   // Loading state
   if (loading) {
@@ -157,7 +157,7 @@ function ResultsContent() {
                     : `${bundle.itemCount} of ${bundle.itemCount + bundle.missingItems} items available`}
                 </p>
                 <div className="text-4xl font-bold text-blue-600 mb-2">
-                  ${bundle.totalPrice.toFixed(2)}
+                  ${(bundle.totalPrice || 0).toFixed(2)}
                 </div>
                 {bundle.completeness < 100 && (
                   <p className="text-xs text-amber-600 mb-4">
@@ -237,11 +237,7 @@ function ResultsContent() {
                           </h4>
                           
                           <div className="text-2xl font-bold text-blue-600 mb-2">
-                            ${(() => {
-                              const cleaned = String(product.price).replace(/[$,\s]/g, '');
-                              const parsed = parseFloat(cleaned);
-                              return isNaN(parsed) ? product.price : parsed.toFixed(2);
-                            })()}
+                            ${parseFloat(product.price).toFixed(2)}
                           </div>
 
                           {product.rating && (
